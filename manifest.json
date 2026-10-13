@@ -1,0 +1,1 @@
+{ "name": "トレーニング管理", "short_name": "トレーニング", "start_url": "./", "display": "standalone", "background_color": "#f4f6f5", "theme_color": "#1a7a6d", "icons": [ { "src": "icon.png", "sizes": "180x180", "type": "image/png" } ] }
