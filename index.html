@@ -249,6 +249,17 @@ svg .m.s1{fill:var(--s1)}svg .m.s2{fill:var(--s2)}svg .m.s3{fill:var(--s3)}
 .kv{display:grid;grid-template-columns:76px 1fr;gap:6px 10px;font-size:13.5px;padding:0 0 14px;margin:0}
 .kv dt{color:var(--muted)}.kv dd{margin:0;min-width:0}
 
+/* ---- Menu edit ---- */
+.edrow{display:grid;grid-template-columns:1fr 34px 34px 34px;gap:6px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.edrow input{border:1px solid var(--line);background:var(--surface2);border-radius:9px;padding:8px 10px;font-size:14px;min-width:0;width:100%}
+.edrow input.nm{grid-column:1/-1;font-weight:600}
+.edrow input.alt{grid-column:1/-1;font-size:12.5px;padding:6px 10px}
+.edrow .ib{width:32px;height:34px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-size:14px;display:flex;align-items:center;justify-content:center;padding:0}
+.edrow .ib.del{color:var(--bad)}
+.edhead{display:grid;grid-template-columns:1fr 92px;gap:6px;margin-bottom:8px}
+.edhead input{border:1px solid var(--line);background:var(--surface2);border-radius:9px;padding:8px 10px;font-size:14px;min-width:0;width:100%}
+
+
 /* ---- Log / data ---- */
 table.data{width:100%;border-collapse:collapse;font-size:13.5px}
 table.data th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line)}
@@ -514,6 +525,9 @@ const MENUS = {
   rest:{name:'休み',min:0,primary:[],secondary:[],about:'完全休養。食事とタンパク質、睡眠を優先する日。',ex:[]}
 };
 const MENU_KEYS = ['A','B','C','D','E','F','rest'];
+const BASE_MENUS = JSON.parse(JSON.stringify(MENUS));
+function applyMenuOverrides(){ const o=(state.set&&state.set.menus)||{}; for(const k of Object.keys(BASE_MENUS)){ const b=BASE_MENUS[k], c=o[k]; MENUS[k].name=(c&&c.name)||b.name; MENUS[k].min=(c&&c.min)?+c.min:b.min; MENUS[k].ex=(c&&Array.isArray(c.ex))?c.ex.map(x=>x.slice()):b.ex.map(x=>x.slice()); } }
+function menuCustomized(k){ return !!(state.set.menus&&state.set.menus[k]); }
 const COND_LABEL = {1:'1・悪い',2:'2・いまいち',3:'3・ふつう',4:'4・良い',5:'5・とても良い'};
 const DEFAULT_SET = { weekly:{1:{am:1,amMin:60,pm:1,pmMin:75},2:{am:1,amMin:60,pm:1,pmMin:75},3:{am:1,amMin:60,pm:1,pmMin:75},4:{am:1,amMin:60,pm:1,pmMin:75},5:{am:1,amMin:60,pm:1,pmMin:75},6:{am:1,amMin:75,pm:1,pmMin:75},0:{am:0,amMin:60,pm:0,pmMin:60}}, target:4, legsPerWeek:1, prefer:'auto' };
 const HORIZON = 14;
@@ -532,7 +546,7 @@ const md = s => { const d=parse(s); return `${d.getMonth()+1}月${d.getDate()}�
 const mdShort = s => s.slice(5).replace('-','/');
 
 /* ---------------- 状態 ---------------- */
-const state = { tab:'today', date:todayStr(), calMonth:monthOf(todayStr()), selDay:todayStr(), bodyView:'front', logs:{}, plans:{}, set:JSON.parse(JSON.stringify(DEFAULT_SET)), db:null, ready:false, openMenus:{A:true}, showAlts:false, rec:{} };
+const state = { tab:'today', date:todayStr(), calMonth:monthOf(todayStr()), selDay:todayStr(), bodyView:'front', logs:{}, plans:{}, set:JSON.parse(JSON.stringify(DEFAULT_SET)), db:null, ready:false, openMenus:{A:true}, showAlts:false, rec:{}, editMenu:null };
 function emptyLog(date){ return {date, soreness:{}, done:'', time:'', sets:{}, sleep:null, weight:null, cond:null, note:''}; }
 function getLog(date){ return state.logs[date] || emptyLog(date); }
 function planFor(date){ const p=state.plans[monthOf(date)]; return (p && p.days && p.days[date]) || null; }
@@ -540,9 +554,9 @@ function menuOf(date){ const p=planFor(date); return p && p.menu ? p.menu : ''; 
 
 /* ---------------- 保存 ---------------- */
 const LS_KEY='pt-data-v2';
-function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem(LS_KEY)||'{}'); state.logs=j.logs||{}; state.plans=j.plans||{}; if(j.set) state.set={...mergeSet(j.set),updatedAt:j.set.updatedAt}; }catch(e){} }
+function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem(LS_KEY)||'{}'); state.logs=j.logs||{}; state.plans=j.plans||{}; if(j.set) state.set={...mergeSet(j.set),updatedAt:j.set.updatedAt}; }catch(e){} applyMenuOverrides(); }
 function saveLocal(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({logs:state.logs,plans:state.plans,set:state.set})); }catch(e){} }
-function mergeSet(s){ const o=JSON.parse(JSON.stringify(DEFAULT_SET)); if(!s) return o; if(s.weekly) for(const k in o.weekly) o.weekly[k]={...o.weekly[k],...(s.weekly[k]||{})}; if(s.target) o.target=+s.target; if(s.legsPerWeek!=null) o.legsPerWeek=+s.legsPerWeek; if(s.prefer) o.prefer=s.prefer; return o; }
+function mergeSet(s){ const o=JSON.parse(JSON.stringify(DEFAULT_SET)); if(!s) return o; if(s.weekly) for(const k in o.weekly) o.weekly[k]={...o.weekly[k],...(s.weekly[k]||{})}; if(s.target) o.target=+s.target; if(s.legsPerWeek!=null) o.legsPerWeek=+s.legsPerWeek; if(s.prefer) o.prefer=s.prefer; if(s.menus&&typeof s.menus==='object') o.menus=JSON.parse(JSON.stringify(s.menus)); return o; }
 const pending = {};
 function queueWrite(kind,id){ const key=kind+'/'+id; clearTimeout(pending[key]?.t); pending[key]={t:setTimeout(()=>flush(kind,id),900)}; }
 async function flush(kind,id){
@@ -555,7 +569,7 @@ async function flush(kind,id){
 function flushAll(){ const keys=Object.keys(pending); if(!keys.length){ toast('保存済みです'); return; } keys.forEach(k=>{ clearTimeout(pending[k].t); const [kind,id]=k.split('/'); flush(kind,id); }); }
 function setLog(date,patch){ state.logs[date]={...getLog(date),...patch,date}; queueWrite('logs',date); replan(); }
 function setPlanDay(date,patch,silent){ const m=monthOf(date); const p=state.plans[m]?{...state.plans[m],days:{...(state.plans[m].days||{})}}:{month:m,days:{}}; p.days[date]={...(p.days[date]||{}),...patch}; state.plans[m]=p; queueWrite('plans',m); if(!silent) replan(); }
-function setSettings(patch){ state.set={...state.set,...patch}; queueWrite('settings','main'); replan(); }
+function setSettings(patch,quiet){ state.set={...state.set,...patch}; applyMenuOverrides(); queueWrite('settings','main'); if(!quiet) replan(); }
 let toastT; function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1600); }
 
 /* ---------------- 回復データ ---------------- */
@@ -673,7 +687,7 @@ async function gistCreate(){ const g=await gh('/gists',{method:'POST',body:JSON.
 function mergeRemote(j){ if(!j||typeof j!=='object') return false; let changed=false;
   for(const d in (j.logs||{})){ const r=j.logs[d], l=state.logs[d]; if(!l||(r.updatedAt||'')>(l.updatedAt||'')){ state.logs[d]={...emptyLog(d),...r,date:d}; changed=true; } }
   for(const m in (j.plans||{})){ const r=j.plans[m], l=state.plans[m]; if(!l||(r.updatedAt||'')>(l.updatedAt||'')){ state.plans[m]={month:m,days:r.days||{},updatedAt:r.updatedAt}; changed=true; } }
-  if(j.set&&(j.set.updatedAt||'')>(state.set.updatedAt||'')){ state.set={...mergeSet(j.set),updatedAt:j.set.updatedAt}; changed=true; }
+  if(j.set&&(j.set.updatedAt||'')>(state.set.updatedAt||'')){ state.set={...mergeSet(j.set),updatedAt:j.set.updatedAt}; applyMenuOverrides(); changed=true; }
   return changed; }
 async function gistPull(){ const g=await gh('/gists/'+sync.gistId); const f=g.files[GIST_FILE]; if(!f) return false; let txt=f.content; if(f.truncated){ const r=await fetch(f.raw_url); txt=await r.text(); } let j=null; try{ j=JSON.parse(txt); }catch(e){} return mergeRemote(j); }
 async function gistPush(){ await gh('/gists/'+sync.gistId,{method:'PATCH',body:JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify(exportData())}}})}); }
@@ -769,7 +783,7 @@ function prevRecord(ex,before){ const ds=sortedLogDates().filter(d=>d<before).re
 function renderExercises(){
   const log=getLog(state.date), m=log.done, box=document.getElementById('exerciseTable');
   if(!m||m==='rest'||!MENUS[m]){ box.innerHTML=`<p class="small muted" style="margin:10px 0 0">「これをやった」を押すか、メニューを選ぶと種目ごとの重量と回数を書けます。前回の記録も横に出ます。</p>`; return; }
-  box.innerHTML=MENUS[m].ex.map(([n,sets])=>{ const cur=log.sets[n]||{}; const prev=prevRecord(n,state.date); let hint=sets;
+  box.innerHTML=MENUS[m].ex.filter(([n])=>n&&n.trim()).map(([n,sets])=>{ const cur=log.sets[n]||{}; const prev=prevRecord(n,state.date); let hint=sets;
     if(prev){ const reps=String(prev.r||'').split(/[,、 ]+/).map(Number).filter(x=>!isNaN(x)&&x>0); const hi=reps.length&&reps.every(x=>x>=12); hint=`前回 ${prev.w?prev.w+'kg × ':''}${prev.r||'—'}${hi?' <span class="up">↑ 重量UPの目安</span>':''}`; }
     return `<div class="exrow"><div class="nm">${n}<span class="small">${hint}</span></div><label class="f">重量 kg<input type="number" inputmode="decimal" step="0.5" placeholder="—" data-ex="${n}" data-f="w" value="${cur.w??''}"></label><label class="f">回数<input type="text" inputmode="numeric" placeholder="12,12,10" data-ex="${n}" data-f="r" value="${esc(cur.r||'')}"></label></div>`; }).join('');
   box.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{ const l=getLog(state.date); const s={...(l.sets||{})}; const cur={...(s[inp.dataset.ex]||{})}; cur[inp.dataset.f]= inp.dataset.f==='w'?(inp.value===''?null:Number(inp.value)):inp.value; s[inp.dataset.ex]=cur; state.logs[state.date]={...l,sets:s}; queueWrite('logs',state.date); }));
@@ -826,12 +840,41 @@ function renderDaySheet(){
 }
 
 /* ---------------- メニュー ---------------- */
+function saveMenuEdit(k, patch){ const menus=JSON.parse(JSON.stringify(state.set.menus||{})); const cur=menus[k]||{name:MENUS[k].name,min:MENUS[k].min,ex:MENUS[k].ex.map(x=>x.slice())}; menus[k]={...cur,...patch}; setSettings({menus},true); }
 function renderMenu(){
   const keys=['A','B','C','D','E','F','HIIT'];
-  document.getElementById('menuList').innerHTML=keys.map(k=>{ const d=MENUS[k]; const parts=[...d.primary,...d.secondary].map(x=>MNAME[x]).join('・');
-    return `<div class="card menucard ${state.openMenus[k]?'open':''}" id="menu-${k}"><div class="mh" data-k="${k}"><span class="tile md m-${k}" style="${k==='HIIT'?'font-size:13px;width:44px':''}">${k}</span><div class="ttl"><b>${d.name}</b><span>${d.min} min${parts?' ・ '+parts:k==='HIIT'?' ・ 補助メニュー':' ・ 自由'}</span></div><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
-      <div class="mb"><p>${d.about}</p>${d.ex.map(([n,sets,alt])=>{ const e=EX[n]||{}; return `<details><summary><span>${n}</span><span class="sets">${sets}</span></summary><dl class="kv"><dt>どこに効く</dt><dd>${e.t||''}</dd><dt>やり方</dt><dd>${e.how||''}</dd><dt>コツ</dt><dd>${e.tip||''}</dd><dt>代わりの種目</dt><dd>${alt?alt+(e.alt?'、'+e.alt:''):(e.alt||'—')}</dd></dl></details>`; }).join('')}</div></div>`; }).join('');
-  document.querySelectorAll('.menucard .mh').forEach(h=>h.onclick=()=>{ const k=h.dataset.k; state.openMenus[k]=!state.openMenus[k]; h.parentElement.classList.toggle('open',state.openMenus[k]); });
+  const dl=`<datalist id="exlist">${Object.keys(EX).map(n=>`<option value="${n}">`).join('')}</datalist>`;
+  document.getElementById('menuList').innerHTML=dl+keys.map(k=>{ const d=MENUS[k]; const parts=[...d.primary,...d.secondary].map(x=>MNAME[x]).join('・'); const editing=state.editMenu===k;
+    const body = editing ? `
+      <div class="edhead"><input type="text" data-f="name" value="${esc(d.name)}" aria-label="メニュー名"><input type="number" data-f="min" value="${d.min}" min="5" max="180" step="5" inputmode="numeric" aria-label="所要分"></div>
+      <div class="small muted" style="margin-bottom:4px">種目名 ／ セット×回数 ／ ↑ ↓ 削除。下の行に代わりの種目やメモを書けます。</div>
+      ${d.ex.map(([n,sets,alt],i)=>`<div class="edrow" data-i="${i}"><input class="nm" type="text" list="exlist" data-f="n" value="${esc(n)}" placeholder="種目名"><input type="text" data-f="sets" value="${esc(sets||'')}" placeholder="セット×回数（例 3×10）"><button class="ib" data-mv="-1" aria-label="上へ" ${i===0?'disabled':''}>↑</button><button class="ib" data-mv="1" aria-label="下へ" ${i===d.ex.length-1?'disabled':''}>↓</button><button class="ib del" data-del="1" aria-label="削除">✕</button><input class="alt" type="text" data-f="alt" value="${esc(alt||'')}" placeholder="代わりの種目・メモ（任意）"></div>`).join('')}
+      <div class="row between" style="margin-top:12px"><button class="btn sm" data-add="1">＋ 種目を追加</button><div class="row"><button class="link" data-reset="1">初期設定に戻す</button><button class="btn sm primary" data-done="1">完了</button></div></div>`
+    : `<p>${d.about}</p>${d.ex.length?d.ex.map(([n,sets,alt])=>{ const e=EX[n]||{}; return `<details><summary><span>${esc(n)}</span><span class="sets">${esc(sets||'')}</span></summary><dl class="kv"><dt>どこに効く</dt><dd>${e.t||'（自分で追加した種目）'}</dd><dt>やり方</dt><dd>${e.how||'—'}</dd><dt>コツ</dt><dd>${e.tip||'—'}</dd><dt>代わりの種目</dt><dd>${alt?esc(alt)+(e.alt?'、'+e.alt:''):(e.alt||'—')}</dd></dl></details>`; }).join(''):'<div class="empty">種目がありません。「編集」で追加してください。</div>'}
+      <div class="row between" style="margin-top:12px"><span class="small muted">${menuCustomized(k)?'編集済み':'初期設定'}</span><button class="btn sm" data-edit="1">編集</button></div>`;
+    return `<div class="card menucard ${state.openMenus[k]||editing?'open':''}" id="menu-${k}"><div class="mh" data-k="${k}"><span class="tile md m-${k}" style="${k==='HIIT'?'font-size:13px;width:44px':''}">${k}</span><div class="ttl"><b>${esc(d.name)}</b><span>${d.min} min${parts?' ・ '+parts:k==='HIIT'?' ・ 補助メニュー':' ・ 自由'}</span></div><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div class="mb" data-k="${k}">${body}</div></div>`; }).join('');
+  document.querySelectorAll('.menucard .mh').forEach(h=>h.onclick=()=>{ const k=h.dataset.k; if(state.editMenu===k) return; state.openMenus[k]=!state.openMenus[k]; h.parentElement.classList.toggle('open',state.openMenus[k]); });
+  document.querySelectorAll('.menucard .mb').forEach(mb=>{
+    const k=mb.dataset.k;
+    mb.addEventListener('click',e=>{
+      const b=e.target.closest('button'); if(!b) return;
+      if(b.dataset.edit){ state.editMenu=k; state.openMenus[k]=true; renderMenu(); return; }
+      if(b.dataset.done){ state.editMenu=null; replan(); renderMenu(); toast('メニューを保存しました'); return; }
+      if(b.dataset.reset){ const menus=JSON.parse(JSON.stringify(state.set.menus||{})); delete menus[k]; setSettings({menus},true); renderMenu(); toast('初期設定に戻しました'); return; }
+      if(b.dataset.add){ const ex=MENUS[k].ex.map(x=>x.slice()); ex.push(['','3×10','']); saveMenuEdit(k,{ex}); renderMenu(); const rows=document.querySelectorAll(`#menu-${k} .edrow`); const last=rows[rows.length-1]; if(last) last.querySelector('input').focus(); return; }
+      const row=b.closest('.edrow'); if(!row) return; const i=+row.dataset.i; const ex=MENUS[k].ex.map(x=>x.slice());
+      if(b.dataset.del){ ex.splice(i,1); saveMenuEdit(k,{ex}); renderMenu(); return; }
+      if(b.dataset.mv){ const j=i+(+b.dataset.mv); if(j<0||j>=ex.length) return; [ex[i],ex[j]]=[ex[j],ex[i]]; saveMenuEdit(k,{ex}); renderMenu(); return; }
+    });
+    mb.addEventListener('input',e=>{
+      const inp=e.target; if(inp.tagName!=='INPUT') return; const f=inp.dataset.f; if(!f) return;
+      if(f==='name'){ saveMenuEdit(k,{name:inp.value.trim()||BASE_MENUS[k].name}); return; }
+      if(f==='min'){ const v=+inp.value; if(v>=5) saveMenuEdit(k,{min:v}); return; }
+      const row=inp.closest('.edrow'); if(!row) return; const i=+row.dataset.i; const ex=MENUS[k].ex.map(x=>x.slice()); if(!ex[i]) return;
+      const idx={n:0,sets:1,alt:2}[f]; ex[i][idx]=inp.value; saveMenuEdit(k,{ex});
+    });
+  });
 }
 
 /* ---------------- 記録 ---------------- */
@@ -904,7 +947,7 @@ function bind(){
   document.getElementById('ghDisconnect').onclick=()=>{ gistDisconnect(); renderSettings(); toast('接続を解除しました'); };
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&sync.token&&sync.gistId&&!state.db) gistSyncNow(); });
   document.getElementById('ioExport').onclick=async()=>{ const txt=JSON.stringify({v:2,exportedAt:new Date().toISOString(),logs:state.logs,plans:state.plans,set:state.set}); const ta=document.getElementById('ioText'); ta.value=txt; const st=document.getElementById('ioStatus'); try{ await navigator.clipboard.writeText(txt); st.textContent='コピーしました'; }catch(e){ ta.focus(); ta.select(); st.textContent='全選択してコピーしてください'; } };
-  document.getElementById('ioImport').onclick=()=>{ const st=document.getElementById('ioStatus'); try{ const j=JSON.parse(document.getElementById('ioText').value); if(!j||typeof j!=='object'||(!j.logs&&!j.plans)) throw 0; let n=0; for(const d in (j.logs||{})){ state.logs[d]={...emptyLog(d),...j.logs[d],date:d}; queueWrite('logs',d); n++; } for(const m in (j.plans||{})){ state.plans[m]={month:m,days:(j.plans[m].days||{})}; queueWrite('plans',m); } if(j.set){ state.set=mergeSet(j.set); queueWrite('settings','main'); } replan(); renderAll(); st.textContent=`${n}日分の記録を読み込みました`; }catch(e){ st.textContent='読み込めませんでした。書き出したテキストをそのまま貼ってください'; } };
+  document.getElementById('ioImport').onclick=()=>{ const st=document.getElementById('ioStatus'); try{ const j=JSON.parse(document.getElementById('ioText').value); if(!j||typeof j!=='object'||(!j.logs&&!j.plans)) throw 0; let n=0; for(const d in (j.logs||{})){ state.logs[d]={...emptyLog(d),...j.logs[d],date:d}; queueWrite('logs',d); n++; } for(const m in (j.plans||{})){ state.plans[m]={month:m,days:(j.plans[m].days||{})}; queueWrite('plans',m); } if(j.set){ state.set=mergeSet(j.set); applyMenuOverrides(); queueWrite('settings','main'); } replan(); renderAll(); st.textContent=`${n}日分の記録を読み込みました`; }catch(e){ st.textContent='読み込めませんでした。書き出したテキストをそのまま貼ってください'; } };
   document.querySelectorAll('nav.tabbar button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   let theme=null; try{ theme=localStorage.getItem('pt-theme')||null; }catch(e){}
   applyTheme(theme);
@@ -929,7 +972,7 @@ async function connect(){
     for(const k in pending){ if(k.startsWith('plans/')){ const id=k.slice(6); if(state.plans[id]) plans[id]=state.plans[id]; } }
     state.plans=plans; got.plans=true; maybeReady();
   }, err=>console.error(err));
-  db.doc('settings/main').onSnapshot(snap=>{ if(!pending['settings/main']) state.set=mergeSet(snap.exists?snap.data():null); got.set=true; maybeReady(); }, err=>{ console.error(err); got.set=true; maybeReady(); });
+  db.doc('settings/main').onSnapshot(snap=>{ if(!pending['settings/main']){ state.set=mergeSet(snap.exists?snap.data():null); applyMenuOverrides(); } got.set=true; maybeReady(); }, err=>{ console.error(err); got.set=true; maybeReady(); });
 }
 bind(); renderAll(); connect();
 </script>
